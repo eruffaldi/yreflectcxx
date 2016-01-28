@@ -4,14 +4,14 @@ SET(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
 
 find_package(Clang REQUIRED)
 include_directories(${CLANG_INCLUDE_DIRS})
-
+include_directories(extern)
 SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -D__STDC_LIMIT_MACROS  -D__STDC_CONSTANT_MACROS --std=c++11") 
 
 option(CLANG37 "CLang 3.7+" ON)
 
 if(CLANG37)
 set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DCLANG37") 
-set(EXTRACLANG LLVM-3.7svn)
+set(EXTRACLANG LLVM-3.7)
 else()
 set(EXTRACLANG LLVM-3.5)
 endif()
@@ -38,5 +38,5 @@ set(CL_LIBS
   curses
   )
 
-add_executable(yreflect yreflect.cpp)
+add_executable(yreflect yreflect.cpp extern/jsoncpp.cpp)
 target_link_libraries(yreflect ${CL_LIBS} ${CLANG_LIBS})

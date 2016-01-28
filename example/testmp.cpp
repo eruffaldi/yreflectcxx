@@ -1,12 +1,14 @@
 
 int main(int argc)
 {	
-	#pragma omp parallel
+	int w = 0;
+//	#pragma omp parallel
 	{
-		#pragma omp task
+//		#pragma omp task
 		if(argc == 10)
-			return 100;
+			w = 100;
 		else
-			return -1;
+			w = 20;
 	}
+	return w;
 }
