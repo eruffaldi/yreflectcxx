@@ -40,3 +40,6 @@ set(CL_LIBS
 
 add_executable(yreflect yreflect.cpp extern/jsoncpp.cpp)
 target_link_libraries(yreflect ${CL_LIBS} ${CLANG_LIBS})
+
+add_executable(yextractmp yextractmp.cpp extern/jsoncpp.cpp)
+target_link_libraries(yextractmp ${CL_LIBS} ${CLANG_LIBS})

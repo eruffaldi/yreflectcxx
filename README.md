@@ -1,4 +1,8 @@
+Objective
+===========================
 
+1) yreflect has the objective to extract memory layout of variables
+2) yextractmp has the objective of extracing the OpenMP statements
 
 Building
 =========
@@ -7,8 +11,8 @@ Due to the various possible locations of LLVM
 
 cmake .. -DLLVM_INCLUDE_DIR=/opt/local/libexec/llvm-3.7/include -DLLVM_LIB_DIR=/opt/local/libexec/llvm-3.7/lib
 
-Example
-=========
+Example of Reflector
+====================
 
 For the example test.cpp produces:
 
@@ -18,8 +22,8 @@ array n: q: s:20 sub:
 enum n:PippoEnum q:cff::Pippo::PippoEnum s:0 sub:
 record n:Pippo2 q:cff::Pippo::Pippo2 s:4 sub:
 
-Related Tools
-=============
+Related Tools for Reflector
+===========================
 
 - cppbinder
 	https://git.acm.jhu.edu/poneil/cpp_binder/
