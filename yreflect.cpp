@@ -1,7 +1,7 @@
 /**
  * Clang Data Structure Reflector
  *
- * Emanuele Ruffaldi 2015
+ * Emanuele Ruffaldi 2015-2016
  */
 #include <sstream>
 #include <string>
@@ -20,7 +20,11 @@
 #include "clang/Rewrite/Core/Rewriter.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/AST/RecordLayout.h"
-
+#include "clang/Frontend/FrontendActions.h"
+#include "clang/Tooling/CommonOptionsParser.h"
+#include "clang/Tooling/Tooling.h"
+// Declares llvm::cl::extrahelp.
+#include "llvm/Support/CommandLine.h"
 /**
  * OutputType: enum or types declared inside another type are flattened top level
  *
@@ -294,9 +298,65 @@ public:
 		return true;
 	}
 
+	bool MyVisitStmt(Stmt * p, int level =0)
+	{	
+		for(int i = 0; i < level; i++)
+			std::cout << ' ';
+		std::cout << "MyVisitStmt:" << p->getStmtClassName() << " " << level << std::endl;
+		switch(p->getStmtClass())
+		{
+			case Stmt::CompoundStmtClass:
+			{
+				CompoundStmt * C = cast<CompoundStmt>(p);
+				for (Stmt *SubStmt : C->children())
+				{
+					MyVisitStmt(SubStmt,level+1);
+				}
+				break;
+			}
+			case Stmt::IfStmtClass:
+			{
+				IfStmt * I = cast<IfStmt>(p);
+				if (Stmt *Then = I->getThen()) {
+					std::cout << "Then:\n";
+					MyVisitStmt(Then,level+1);
+				}
+				if (Stmt *Else = I->getElse()) {
+					std::cout << "Else:\n";
+					MyVisitStmt(Else,level+1);
+				}
+				break;
+			}
+			case Stmt::ForStmtClass:
+			{
+				break;
+			}
+			case Stmt::ReturnStmtClass:
+			{
+				break;
+			}
+			default:
+			{
+				std::cout << "unknown " << p->getStmtClassName() << std::endl;
+				break;
+			}
+		}
+		return true;
+	}
+
 	bool TraverseFunctionDecl(FunctionDecl * fx)
 	{
-		return true;
+		std::cout << "!!!! Function Declaration \n";
+		if(!fx->getBody())
+		{
+			return false;
+		}
+		else
+		{
+			Stmt * p = fx->getBody();
+			MyVisitStmt(p);
+			return false; // no recursion
+		}
 	}
 
 
@@ -429,6 +489,7 @@ public:
 			switch (s->getKind())
 			{
 			case clang::Decl::Function:
+				return TraverseFunctionDecl(cast<FunctionDecl>(s));
 			case clang::Decl::Namespace:
 			case clang::Decl::ClassTemplate:
 			case clang::Decl::EnumConstant:
@@ -715,13 +776,25 @@ void usage()
 	printf("yextract tool by Emanuele Ruffaldi 2015\nSyntax: yextract sourcefile.cpp [tooloptions] -- [compileroptions]");
 }
 
+using namespace clang::tooling;
+using namespace llvm;
+
+static cl::OptionCategory MyToolCategory("my-tool options");
+
+static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
+
+// A help message for this specific tool can be added afterwards.
+static cl::extrahelp MoreHelp("\nMore help text...");
+
+
+
 int main(int argc, const char **argv) {
 	if(argc < 3)
 	{
 		usage();
 		return -1;
 	}
-	CommonOptionsParser op(argc, argv, ToolingSampleCategory);
+	CommonOptionsParser op(argc, argv, MyToolCategory);
 	ClangTool Tool(op.getCompilations(), op.getSourcePathList());
 
 	// ClangTool::run accepts a FrontendActionFactory, which is then used to

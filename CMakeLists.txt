@@ -38,5 +38,5 @@ set(CL_LIBS
   curses
   )
 
-add_executable(yextract yextract.cpp)
-target_link_libraries(yextract ${CL_LIBS} ${CLANG_LIBS})
+add_executable(yreflect yreflect.cpp)
+target_link_libraries(yreflect ${CL_LIBS} ${CLANG_LIBS})
