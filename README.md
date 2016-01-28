@@ -22,6 +22,13 @@ array n: q: s:20 sub:
 enum n:PippoEnum q:cff::Pippo::PippoEnum s:0 sub:
 record n:Pippo2 q:cff::Pippo::Pippo2 s:4 sub:
 
+Related Publication
+===================
+The following pubblication is associated to the work discussed here. In particular the SOMA framework was aimed at static multicore partioning of the execution of multicore algorithms.
+
+	Ruffaldi E., Dabisias G., Brizzi F. & Buttazzo G. (2016). SOMA: An OpenMP Toolchain For Multicore Partitioning. In 31st ACM/SIGAPP Symposium on Applied Computing . ACM.
+
+
 Related Tools for Reflector
 ===========================
 
