@@ -32,6 +32,21 @@ using namespace clang::tooling;
 
 static llvm::cl::OptionCategory ToolingSampleCategory("Tooling Sample");
 
+template <typename a, typename b>
+struct Pair2Value
+{
+	Pair2Value(std::pair<a,b> az): z(az) {}
+	operator Json::Value () { 
+		Json::Value q;
+		q[0] = z.first;
+		q[1] = z.second;
+		return q;
+	}
+
+	std::pair<a,b>  z;
+};
+
+
 class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
 public:
 	MyASTVisitor(Rewriter &R, ASTContext*A,Json::Value &aroot, int &astatementid) : statementid(astatementid) ,TheRewriter(R) , context(A),root(aroot){}
@@ -48,12 +63,39 @@ public:
 		return true;
 	}
 
+	// assume same file
+	std::pair<int,int> getloc(clang::SourceLocation  s)
+	{
+		const clang::SourceManager &SM = TheRewriter.getSourceMgr();
+		clang::PresumedLoc PLoc = SM.getPresumedLoc(s);	
+		if(PLoc.isInvalid())
+			return std::make_pair<int,int>(0,0);		
+		else
+			return std::make_pair<int,int>(PLoc.getLine(),PLoc.getColumn());
+	}
+
+	// assume same file
+	std::string getlocstr(clang::SourceLocation  s) 
+	{
+		const clang::SourceManager &SM = TheRewriter.getSourceMgr();
+		clang::PresumedLoc PLoc = SM.getPresumedLoc(s);	
+		if(PLoc.isInvalid())
+			return "unknown";	
+		else
+		{
+			std::ostringstream ons;
+			ons << PLoc.getLine() << ":" << PLoc.getColumn();
+			return ons.str();
+		}
+	}
+
 	bool MyVisitStmt(Stmt * p,int level , Json::Value & parent)
 	{	
 		for(int i = 0; i < level; i++)
 			std::cout << ' ';
 		std::cout << "stmt:" << p->getStmtClassName() << " " << level << std::endl;
 		Json::Value self;
+		self["loc"] = Pair2Value<int,int>(getloc(p->getLocStart()));
 		bool descend = true;
 		switch(p->getStmtClass())
 		{
