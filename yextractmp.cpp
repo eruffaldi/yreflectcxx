@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <fstream>
 
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTConsumer.h"
@@ -33,7 +34,7 @@ static llvm::cl::OptionCategory ToolingSampleCategory("Tooling Sample");
 
 class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
 public:
-	MyASTVisitor(Rewriter &R, ASTContext*A,Json::Value &aroot) : TheRewriter(R) , context(A),root(aroot) {}
+	MyASTVisitor(Rewriter &R, ASTContext*A,Json::Value &aroot, int &astatementid) : statementid(astatementid) ,TheRewriter(R) , context(A),root(aroot){}
 
 
 	/// from top level
@@ -65,13 +66,14 @@ public:
 			case Stmt::IfStmtClass:
 			{
 				self["type"] = "if";
+				self["id"] = statementid++;
 
 				IfStmt * I = cast<IfStmt>(p);
 				if (Stmt *Then = I->getThen()) {
-					MyVisitStmt(Then,level+1,self["if"]);
+					MyVisitStmt(Then,level+1,self["children"]);
 				}
 				if (Stmt *Else = I->getElse()) {
-					MyVisitStmt(Else,level+1,self["else"]);
+					MyVisitStmt(Else,level+1,self["children"]);
 				}
 				descend = false;
 				parent.append(self);
@@ -94,6 +96,7 @@ public:
 			case Stmt::ReturnStmtClass:
 			{
 				descend = false;
+				self["id"] = statementid++;
 				self["type"] = "return";
 				parent.append(self);
 				break;
@@ -103,9 +106,47 @@ public:
 				self["type"] = "OMPTaskDirectiveClass";
 				break;
 			}
+			case Stmt::ContinueStmtClass:
+			{
+				std::cerr << "continue\n";
+				self["type"] = "continue";
+				self["id"] = statementid++;
+				descend =false;
+				parent.append(self);
+				break;
+			}
+			case Stmt::BreakStmtClass:
+			{
+				std::cerr << "break\n";
+				self["type"] = "break";
+				self["id"] = statementid++;
+				descend =false;
+				parent.append(self);
+				break;
+			}
+			case Stmt::WhileStmtClass:
+			{
+				// getConditionVariable () const -> VarDecl
+				// getConditionVariableDeclStmt ()  -> DeclStmt
+				// getCond -> Expr
+				// getBody
+				// getWhileLoc () const
+				// getLocStart () const LLVM_READONLY
+				std::cerr << "while\n";
+				WhileStmt * C = cast<WhileStmt>(p);
+				self["type"] = "while";
+				self["id"] = statementid++;
+				descend = false;
+				MyVisitStmt(C->getBody(),level+1,self["children"]);
+				parent.append(self);
+				break;
+			}
 			case Stmt::DeclStmtClass:
 			{
+				std::cout << "DeclStmtClass " << std::endl;
+//				self["type"] = "decl";
 				descend = false;
+//				parent.append(self);
 				break;
 			}			
 			case Stmt::OMPParallelDirectiveClass:
@@ -115,13 +156,22 @@ public:
 			}
 			default:
 			{
-				std::cout << "\t\tunknown " << std::endl;
+				if(isa<Expr>(p))
+				{
+					//std::cout << "\t\tunknown expr " << p->getStmtClass() << std::endl;
+					self["id"] = statementid++;
+					self["type"] = "expr";
+					parent.append(self);
+				}
+				else
+				std::cout << "\t\tunknown " << p->getStmtClass() << std::endl;
 				descend = false;
 				break;
 			}
 		}
 		if(descend)
 		{
+			self["id"] = statementid++;
 			for (Stmt *SubStmt : p->children())
 			{
 				MyVisitStmt(SubStmt,level+1,self["children"]);
@@ -140,6 +190,7 @@ public:
 		else
 		{
 			Json::Value self;
+			self["id"] = statementid++;
 			self["type"] = "function";
 			self["name"] = (std::string)fx->getName();
 			Stmt * p = fx->getBody();
@@ -235,6 +286,7 @@ public:
 
 
 private:
+	int & statementid;
 	Rewriter &TheRewriter;
 	Json::Value& root;
 	ASTContext * context;
@@ -244,7 +296,7 @@ private:
 // by the Clang parser.
 class MyASTConsumer : public ASTConsumer {
 public:
-	MyASTConsumer(Rewriter &R, ASTContext *A, CompilerInstance &CI,Json::Value& aroot) : Visitor(R, A,aroot),root(aroot) {}
+	MyASTConsumer(Rewriter &R, ASTContext *A, CompilerInstance &CI,Json::Value& aroot, int & astatementid) : Visitor(R, A,aroot,astatementid),root(aroot) {}
 
 	void HandleTranslationUnit(ASTContext &Context) override {
 		/* we can use ASTContext to get the TranslationUnitDecl, which is
@@ -279,7 +331,8 @@ public:
 		Json::StreamWriterBuilder wbuilder;
 		wbuilder["indentation"] = "  ";
 		std::string document = Json::writeString(wbuilder, root);
-		std::cout << document;
+		std::ofstream onf("out.json");
+		onf << document;
 	}
 
 	void EndSourceFileAction() override {
@@ -295,17 +348,18 @@ public:
 	        StringRef file) override {
 		llvm::errs() << "** Creating AST consumer for: " << file << "\n";
 		TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
-		return llvm::make_unique<MyASTConsumer>(TheRewriter, &CI.getASTContext(), CI,root[file]);
+		return llvm::make_unique<MyASTConsumer>(TheRewriter, &CI.getASTContext(), CI,root[file],statementid);
 	}
 #else
 	ASTConsumer* CreateASTConsumer(CompilerInstance &CI,
 	                               StringRef file) override {
 		llvm::errs() << "** Creating AST consumer for: " << file << "\n";
 		TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
-		return new MyASTConsumer(TheRewriter, &CI.getASTContext(), CI,root[file]);
+		return new MyASTConsumer(TheRewriter, &CI.getASTContext(), CI,root[file],statementid);
 	}
 #endif
 private:
+	int statementid = 1;
 	Json::Value root;
 	Rewriter TheRewriter;
 };

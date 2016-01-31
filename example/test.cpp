@@ -1,6 +1,6 @@
 //#include <array>
 
-namespace cff
+namespace www
 {
 	struct Pippo
 	{
@@ -44,13 +44,36 @@ namespace cff
 
 }
 
-
-// ciao
-int main(int argc, char const *argv[])
-{
-	cff::X q;
-	cff::X2 q2;
-	return sizeof(cff::X2) + q.A;
+/*
+ Prev:
+ 3 while: 1, 10 continue is invisible OK BUT 10 twice!
+ 5 if: 3
+ 7 expr: 5
+ 10 if: 5
+ 12 expr: 10
+ 13 return: 7 3
+ */
+int main(int argc, char const *argv[]) // 1
+{ // 2 removed from flow? 
+	www::X q;
+	www::X2 q2;
+	int w = argc;
+	while(w > 0) // 3
+	{ // 4 -> removed from flow
+		if(w == 2) // 5
+		{ // 6 -> removed from flow
+			argc++; // 7
+			break; // 8
+		}
+		else 
+		{ // 9 -> removed from flow
+			if(argc > 2) // 10
+				continue; // 11
+			else 
+				w--; // 12
+		}
+	}	
+	return sizeof(www::X2) + q.A; // 13
 }
 
-	cff::X3 q2;
+www::X3 q2;

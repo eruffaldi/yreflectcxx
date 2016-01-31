@@ -32,6 +32,7 @@
 class OType
 {
 public:
+	static int progressive;
 	enum class Type { Alias, Record, Primitive, Pointer, Reference, Array, Enum , MaxType};
 	Type type;
 
@@ -42,12 +43,14 @@ public:
 		return names[(int)type];
 	}
 
+	OType() : iid(progressive++) {}
+
 	std::string name; // basic name
 	std::string scope; // namespace or full class
 	std::string qualified; // with scope and original name
 	std::shared_ptr<OType> detail; // optional templatebase for Record/Union, pointed for Alias, pointed for Pointer/Reference/Array, implementation for Enum
 	std::vector<std::shared_ptr<OType> > bases; // parents
-
+	int iid = 0;
 	int itemscount = 0; // items for array
 	int size = 0; // size in bytes
 	bool named = false; // is named
@@ -60,10 +63,12 @@ public:
 		std::shared_ptr<OType> type;
 	};
 
-	std::vector<OField> fields; // for Record or Union, in the case
+	std::vector<OField> fields; // for Record or Union or Enum
+
 	bool isunion = false; // for record
 
 };
+int OType::progressive = 1;
 
 
 using namespace clang;
@@ -72,13 +77,64 @@ using namespace clang::tooling;
 
 static llvm::cl::OptionCategory ToolingSampleCategory("Tooling Sample");
 
-class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
-public:
-	MyASTVisitor(Rewriter &R, ASTContext*A,Json::Value &aroot) : TheRewriter(R) , context(A),root(aroot) {}
-
+struct TypeAccumulator
+{
 	std::vector<std::shared_ptr<OType> > types;
 	std::map<std::string, std::shared_ptr<OType> > type2otype;
 	std::map<clang::Decl *, std::shared_ptr<OType> > decl2otype;
+
+
+	void DumpOut(Json::Value & root)
+	{
+		for (auto & t : types )
+		{
+			std::cout << t->getTypeAsString() << " n:" << t->name << " q:" << t->qualified << " s:" << t->size << " sub:" << (!t->detail ? "" : t->detail->qualified) << std::endl;
+
+			Json::Value self;
+			self["name"] =t->name;
+			self["type"] =t->getTypeAsString();
+			self["qualified"] = t->qualified;
+			self["size"] = t->size;
+			if(t->detail)
+				self["itemtype"] = t->detail->iid;
+
+			if (t->type == OType::Type::Record)
+			{
+				self["isunion"] = t->isunion;
+				for(auto & x: t->fields)
+				{
+					Json::Value sub;
+					sub["name"] = x.name;
+					sub["offset"] = (int)x.offset_or_value;
+					if(x.type)
+						sub["type"] = x.type->iid; // TODO dump
+					self["fields"].append(sub);
+				}
+			}
+			else if(t->type == OType::Type::Array)
+			{
+				self["items"] = t->itemscount;
+			}
+			else if(t->type == OType::Type::Enum)
+			{
+				for(auto & x: t->fields)
+				{
+					Json::Value sub;
+					sub["name"] = x.name;
+					sub["value"] = (int)x.offset_or_value;
+					self["fields"].append(sub);
+				}
+			}
+			root[std::to_string(t->iid)] = self;
+		}
+	}
+
+};
+
+class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
+public:
+	MyASTVisitor(Rewriter &R, ASTContext*A,TypeAccumulator &ata,Json::Value &aroot) : TheRewriter(R) , context(A),ta(ata),root(aroot) {}
+	TypeAccumulator &ta;
 
 	std::string DecodeType(clang::QualType t)
 	{
@@ -169,6 +225,8 @@ public:
 		clang::QualType ctype(t);
 		std::string tname = ctype.getAsString();
 
+		std::cout << "DecodeOType " << tname << std::endl;
+
 		// If this is an array of constant size, strip the size from the type and store it in the parameter info
 		if (const clang::ConstantArrayType* array_type = dyn_cast<clang::ConstantArrayType>(ctype))
 		{
@@ -176,7 +234,7 @@ public:
 			out->type = OType::Type::Array;
 			out->size = *array_type->getSize().getRawData();
 			out->detail = solveouttype(array_type->getElementType());
-			types.push_back(out);
+			ta.types.push_back(out);
 			return out;
 		}
 		else if (const clang::PointerType* ptr_type = dyn_cast<clang::PointerType>(ctype))
@@ -184,7 +242,7 @@ public:
 			std::shared_ptr<OType> out(new OType());
 			out->type = OType::Type::Pointer;
 			out->detail = solveouttype(ptr_type->getPointeeType());
-			types.push_back(out);
+			ta.types.push_back(out);
 			return out;
 		}
 		else if (const clang::LValueReferenceType* ref_type = dyn_cast<clang::LValueReferenceType>(ctype))
@@ -193,7 +251,7 @@ public:
 			std::shared_ptr<OType> out(new OType());
 			out->type = OType::Type::Reference;
 			out->detail = solveouttype(ptr_type->getPointeeType());
-			types.push_back(out);
+			ta.types.push_back(out);
 			return out;
 			//ctype.Set(ref_type->getPointeeType());
 		}
@@ -206,8 +264,6 @@ public:
 			else
 				return std::shared_ptr<OType>(0);
 		}
-
-
 		else if (const clang::RecordType* ts = dyn_cast<clang::RecordType>(ctype))
 		{
 			return std::shared_ptr<OType>(0);
@@ -232,15 +288,14 @@ public:
 		}
 		else if (const clang::BuiltinType* ts = dyn_cast<clang::BuiltinType>(ctype))
 		{
-			return std::shared_ptr<OType>(0);
 			// TODO: deduplicate
 			clang::LangOptions LangOpts;
 			LangOpts.CPlusPlus = true;
 			clang::PrintingPolicy Policy(LangOpts);
 
 			std::string qualified = "_builtin_" + std::string(ts->getName(Policy));
-			auto it = type2otype.find(qualified);
-			if (it == type2otype.end())
+			auto it = ta.type2otype.find(qualified);
+			if (it == ta.type2otype.end())
 			{
 				std::shared_ptr<OType> out(new OType());
 				out->type = OType::Type::Primitive;
@@ -251,15 +306,19 @@ public:
 #else
 				out->size = context->getTypeInfo(ts).first / 8;
 #endif
-				type2otype[qualified] = out;
-				types.push_back(out);
+				ta.type2otype[qualified] = out;
+				ta.types.push_back(out);
 				return out;
 			}
 			else
 				return it->second;
 
 		}
-		return std::shared_ptr<OType>(0);
+		else
+		{
+			std::cout << "\tUNKNOWN TYPE\n";
+			return std::shared_ptr<OType>(0);
+		}
 
 		// Is this a field that can be safely recorded?
 		clang::Type::TypeClass tc = ctype->getTypeClass();
@@ -272,12 +331,11 @@ public:
 		case clang::Type::Record:
 			break;
 		default:
-		{
-			std::ostringstream ons;
+			{
+				std::ostringstream ons;
 
-			ons << "unsupported-class " << (int)tc << std::endl;
-
-		}
+				ons << "unsupported-class " << (int)tc << std::endl;
+			}
 		}
 
 		//const clang::ClassTemplateDecl* template_decl = cts_decl->getSpecializedTemplate();
@@ -297,111 +355,20 @@ public:
 		return true;
 	}
 
-	bool MyVisitStmt(Stmt * p,int level , Json::Value & parent)
-	{	
-		for(int i = 0; i < level; i++)
-			std::cout << ' ';
-		std::cout << "stmt:" << p->getStmtClassName() << " " << level << std::endl;
-		Json::Value self;
-		bool descend = true;
-		switch(p->getStmtClass())
-		{
-			case Stmt::CompoundStmtClass:
-			{
-				self["type"] = "compound";
-				descend = true;
-				break;
-			}
-			case Stmt::IfStmtClass:
-			{
-				self["type"] = "if";
-
-				IfStmt * I = cast<IfStmt>(p);
-				if (Stmt *Then = I->getThen()) {
-					std::cout << "Then:" << Then->getStmtClassName() << std::endl;
-					MyVisitStmt(Then,level+1,self["if"]);
-				}
-				if (Stmt *Else = I->getElse()) {
-					std::cout << "Else:" << Else->getStmtClassName() << std::endl;
-					MyVisitStmt(Else,level+1,self["else"]);
-				}
-				descend = false;
-				break;
-			}
-			case Stmt::CapturedStmtClass:
-			{
-				break;
-			}
-			case Stmt::ForStmtClass:
-			{
-				self["type"] = "for";
-				ForStmt * C = cast<ForStmt>(p);
-				descend = true;
-				break;
-			}
-			case Stmt::ReturnStmtClass:
-			{
-				descend = false;
-				self["type"] = "return";
-				parent.append(self);
-				break;
-			}
-			case Stmt::OMPTaskDirectiveClass:
-			{
-				break;
-			}
-			case Stmt::DeclStmtClass:
-			{
-				descend = false;
-				break;
-			}			
-			case Stmt::OMPParallelDirectiveClass:
-			{
-				self["type"] = "OMPParallelDirective";
-				parent.append(self);
-				break;
-			}
-			default:
-			{
-				std::cout << "\t\tunknown " << std::endl;
-				break;
-			}
-		}
-		if(descend)
-		{
-			for (Stmt *SubStmt : p->children())
-			{
-				MyVisitStmt(SubStmt,level+1,self["children"]);
-			}
-			parent.append(self);
-		}
-		return true;
-	}
-
 	bool TraverseFunctionDecl(FunctionDecl * fx)
 	{
-		std::cout << "!!!! Function Declaration \n";
-		if(!fx->getBody())
-		{
-			return false;
-		}
-		else
-		{
-			Stmt * p = fx->getBody();
-			MyVisitStmt(p,0,root);
-			return false; // no recursion
-		}
+		return false; // no recursion
 	}
 
 
 	std::shared_ptr<OType> solveouttype( clang::QualType  t)
 	{
 		// check cache or new
-		auto it = type2otype.find(t.getAsString());
-		if (it == type2otype.end())
+		auto it = ta.type2otype.find(t.getAsString());
+		if (it == ta.type2otype.end())
 		{
 			std::shared_ptr<OType> r = DecodeOType(t);
-			type2otype[t.getAsString()] = r;
+			ta.type2otype[t.getAsString()] = r;
 			return r;
 		}
 		else
@@ -421,7 +388,7 @@ public:
 			out->detail = x;
 			out->size = out->detail ? out->detail->size : 0;
 			out->qualified = tad->getQualifiedNameAsString();
-			types.push_back(out);
+			ta.types.push_back(out);
 		}
 		return true;
 	}
@@ -440,7 +407,7 @@ public:
 			out->detail = x;
 			out->size = out->detail ? out->detail->size : 0;
 			out->qualified = tad->getQualifiedNameAsString();
-			types.push_back(out);
+			ta.types.push_back(out);
 		}
 		return true;
 	}
@@ -487,7 +454,7 @@ public:
 			out->named = true;
 			out->detail = solveouttype(enum_decl->getIntegerType());
 			out->size = out->detail ? out->detail->size : 0;
-			types.push_back(out);
+			ta.types.push_back(out);
 
 			for (clang::EnumDecl::enumerator_iterator i = enum_decl->enumerator_begin(); i != enum_decl->enumerator_end(); ++i)
 			{
@@ -597,7 +564,7 @@ public:
 		out->named = true;
 		out->size = layout.getSize().getQuantity();
 		//out->alignment = layout.getAlignment().getQuantity();
-		types.push_back(out);
+		ta.types.push_back(out);
 
 		if (red->getNumBases())
 		{
@@ -645,7 +612,9 @@ public:
 			{
 				clang::FieldDecl* field_decl = dyn_cast<clang::FieldDecl>(*i);
 				out->fields[ifield].name = field_decl->getName();
+				std::cout << "Solving field " << out->fields[ifield].name << std::endl;
 				out->fields[ifield].type = solveouttype(field_decl->getType());
+				std::cout << "\tSolved field " << out->fields[ifield].type << std::endl;
 			}
 			ifield++;
 			break;
@@ -724,17 +693,6 @@ public:
 		return DescendDecl(s, "");
 	}
 
-	void DumpOut()
-	{
-		for (auto & t : types )
-		{
-			std::cout << t->getTypeAsString() << " n:" << t->name << " q:" << t->qualified << " s:" << t->size << " sub:" << (!t->detail ? "" : t->detail->qualified) << std::endl;
-			if (t->type == OType::Type::Record)
-			{
-				// details
-			}
-		}
-	}
 
 
 private:
@@ -747,7 +705,7 @@ private:
 // by the Clang parser.
 class MyASTConsumer : public ASTConsumer {
 public:
-	MyASTConsumer(Rewriter &R, ASTContext *A, CompilerInstance &CI,Json::Value& aroot) : Visitor(R, A,aroot),root(aroot) {}
+	MyASTConsumer(Rewriter &R, ASTContext *A, CompilerInstance &CI,Json::Value& aroot) : Visitor(R, A,ta,aroot),root(aroot) {}
 
 	void HandleTranslationUnit(ASTContext &Context) override {
 		/* we can use ASTContext to get the TranslationUnitDecl, which is
@@ -757,14 +715,16 @@ public:
 			return;
 		Visitor.TraverseDecl(Context.getTranslationUnitDecl());
 
-		std::cout << "result: created " << Visitor.types.size() << " types\n";
-		Visitor.DumpOut();
+		std::cout << "result: created " << ta.types.size() << " types\n";
+		ta.DumpOut(root);
+		std::cout << std::endl;
 
 		// now emit the output
 		// or filter
 	}
 
 private:
+	TypeAccumulator ta;
 	Json::Value &root;
 	MyASTVisitor Visitor;
 	clang::CompilerInstance CI;
@@ -816,7 +776,7 @@ private:
 
 void usage()
 {
-	printf("yextract tool by Emanuele Ruffaldi 2015\nSyntax: yextract sourcefile.cpp [tooloptions] -- [compileroptions]");
+	printf("yextract tool by Emanuele Ruffaldi 2015\nSyntax: yextract sourcefile.cpp [tooloptions] -- [compileroptions]\n");
 }
 
 using namespace clang::tooling;
