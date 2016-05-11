@@ -7,13 +7,12 @@ Objective
 Building
 =========
 
-Tested clangs: 3.5 3.7 3.9
+Tested clangs: 3.5 3.7 3.9 under OSX
 
-Tested with clang 3.7 under OSX:
+	cmake .. -DCLANG37PLUS=OFF -DLLVM_CONFIG=/opt/local/bin/llvm-config-mp-3.5
 	cmake .. -DLLVM_CONFIG=/opt/local/bin/llvm-config-mp-3.7 
 	cmake .. -DLLVM_CONFIG=/opt/local/bin/llvm-config-mp-3.9 
 
-For 3.5 you need to specify the CMAKE option
 
 Example of Reflector
 ====================
