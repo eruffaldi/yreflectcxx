@@ -7,12 +7,18 @@ Objective
 Building
 =========
 
-Tested clangs: 3.5 3.7 3.9 under OSX
+Tested clangs: 3.5 3.7 3.9 under OSX (for OpenMP clang 3.7+ is needed)
 
-	cmake .. -DCLANG37PLUS=OFF -DLLVM_CONFIG=/opt/local/bin/llvm-config-mp-3.5
+	cmake .. -DLLVM_CONFIG=/opt/local/bin/llvm-config-mp-3.5
 	cmake .. -DLLVM_CONFIG=/opt/local/bin/llvm-config-mp-3.7 
 	cmake .. -DLLVM_CONFIG=/opt/local/bin/llvm-config-mp-3.9 
 
+Mac Port Users
+==============
+
+port installed | grep clang
+port search clang | grep clang-
+port install clang-3.9
 
 Example of Reflector
 ====================

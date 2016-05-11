@@ -8,15 +8,11 @@ include_directories(${CLANG_INCLUDE_DIRS})
 include_directories(extern)
 SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -D__STDC_LIMIT_MACROS  -D__STDC_CONSTANT_MACROS --std=c++11") 
 
-option(CLANG37PLUS "CLang 3.7+" ON)
-
-if(CLANG37PLUS)
+if(NOT ${LLVM_VERSION} VERSION_LESS "3.7")
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DCLANG37PLUS") 
+endif()
 set(EXTRACLANG ${LLVM_LIBRARIES})
 link_directories(${LLVM_LIBRARY_DIRS})
-else()
-set(EXTRACLANG LLVM-3.5)
-endif()
 
 
 set(CL_LIBS
