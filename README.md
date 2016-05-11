@@ -7,9 +7,21 @@ Objective
 Building
 =========
 
-Due to the various possible locations of LLVM 
+Tested clangs:
+- 3.6
+- 3.7
+- 3.9
 
-cmake .. -DLLVM_INCLUDE_DIR=/opt/local/libexec/llvm-3.7/include -DLLVM_LIB_DIR=/opt/local/libexec/llvm-3.7/lib
+Due to the various possible locations of LLVM/CLang you need to specify them
+
+Tested with clang 3.7 under OSX:
+	cmake .. -DLLVM_CONFIG=/opt/local/bin/llvm-config-mp-3.7 
+
+Tested with clang 3.9 under OSX:
+	cmake .. -DLLVM_CONFIG=/opt/local/bin/llvm-config-mp-3.9 
+
+
+#-DLLVM_INCLUDE_DIR=/opt/local/libexec/llvm-3.7/include -DLLVM_LIB_DIR=/opt/local/libexec/llvm-3.7/lib
 
 Example of Reflector
 ====================

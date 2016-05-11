@@ -301,7 +301,7 @@ public:
 				out->type = OType::Type::Primitive;
 				out->name = ts->getName(Policy);
 				out->qualified = out->name;
-#ifdef CLANG37
+#ifdef CLANG37PLUS
 				out->size = context->getTypeInfo(ts).Width / 8;
 #else
 				out->size = context->getTypeInfo(ts).first / 8;
@@ -754,7 +754,7 @@ public:
 		// OUTBUF TheRewriter.getEditBuffer(SM.getMainFileID()).write(llvm::outs());
 	}
 
-#ifdef CLANG37
+#ifdef CLANG37PLUS
 	std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
 	        StringRef file) override {
 		llvm::errs() << "** Creating AST consumer for: " << file << "\n";

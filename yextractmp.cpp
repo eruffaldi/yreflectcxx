@@ -385,7 +385,7 @@ public:
 		// OUTBUF TheRewriter.getEditBuffer(SM.getMainFileID()).write(llvm::outs());
 	}
 
-#ifdef CLANG37
+#ifdef CLANG37PLUS
 	std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
 	        StringRef file) override {
 		llvm::errs() << "** Creating AST consumer for: " << file << "\n";
