@@ -408,7 +408,7 @@ private:
 
 void usage()
 {
-	printf("yextractmp tool by Emanuele Ruffaldi 2015-2016\nSyntax: yextractmp sourcefile.cpp [tooloptions] -- [compileroptions]");
+	printf("yextractmp tool by Emanuele Ruffaldi 2015-2016\nSyntax: yextractmp sourcefile.cpp [tooloptions] [-- [compileroptions]]\n-fopenmp is automatically added\n");
 }
 
 using namespace clang::tooling;
@@ -420,7 +420,8 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 
 // A help message for this specific tool can be added afterwards.
 static cl::extrahelp MoreHelp("\nMore help text...");
-
+//static cl::opt<bool> YourOwnOption("abc", cl::cat(MyToolCategory));
+// Usage: llvm::outs() << YourOwnOption.getValue();
 
 int main(int argc, const char **argv) {
 	if(argc < 3)
@@ -428,7 +429,21 @@ int main(int argc, const char **argv) {
 		usage();
 		return -1;
 	}
-	CommonOptionsParser op(argc, argv, MyToolCategory);
+	std::vector<const char *> fargv;
+	bool missingmm = true;
+
+	for(int i = 0; i < argc; i++)
+	{
+		if(strcmp(argv[i],"--")==0)
+			missingmm = false;
+		fargv.push_back(argv[i]);
+	}
+	if(missingmm)
+		fargv.push_back("--");
+	fargv.push_back("-fopenmp");
+
+	int iargc = fargv.size();
+	CommonOptionsParser op(iargc, &fargv[0], MyToolCategory);
 	ClangTool Tool(op.getCompilations(), op.getSourcePathList());
 
 	// ClangTool::run accepts a FrontendActionFactory, which is then used to

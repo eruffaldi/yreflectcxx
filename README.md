@@ -31,6 +31,12 @@ array n: q: s:20 sub:
 enum n:PippoEnum q:cff::Pippo::PippoEnum s:0 sub:
 record n:Pippo2 q:cff::Pippo::Pippo2 s:4 sub:
 
+
+Example of OpenMP
+====================
+
+./yextractmp ../example/testmp.cpp --
+
 Related Publication
 ===================
 The following pubblication is associated to the work discussed here. In particular the SOMA framework was aimed at static multicore partioning of the execution of multicore algorithms.
