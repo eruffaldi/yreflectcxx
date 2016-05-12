@@ -143,11 +143,6 @@ public:
 				parent.append(self);
 				break;
 			}
-			case Stmt::OMPTaskDirectiveClass:
-			{
-				self["type"] = "OMPTaskDirectiveClass";
-				break;
-			}
 			case Stmt::ContinueStmtClass:
 			{
 				std::cerr << "continue\n";
@@ -193,9 +188,54 @@ public:
 			}			
 			case Stmt::OMPParallelDirectiveClass:
 			{
-				self["type"] = "OMPParallelDirective";
+				self["type"] = "ompparallel";
 				break;
 			}
+			case Stmt::OMPParallelForDirectiveClass:
+			{
+				self["type"] = "ompparallelfor";
+				break;
+			}			
+			case Stmt::OMPSectionsDirectiveClass:
+			{
+				self["type"] = "ompsections";
+				break;
+			}	
+			case Stmt::OMPSectionDirectiveClass:
+			{
+				self["type"] = "ompsection";
+				break;
+			}					
+			case Stmt::OMPSingleDirectiveClass:
+			{
+				self["type"] = "ompsingle";
+				break;
+			}		
+			case Stmt::OMPTaskDirectiveClass:
+			{
+				self["type"] = "omptask";
+				break;
+			}			
+			case Stmt::OMPTaskyieldDirectiveClass:
+			{
+				self["type"] = "omptaskyield";
+				break;
+			}	
+			case Stmt::OMPTaskwaitDirectiveClass:
+			{
+				self["type"] = "omptaskwait";
+				break;
+			}					
+			case Stmt::OMPTaskgroupDirectiveClass:
+			{
+				self["type"] = "omptaskgroup";
+				break;				
+			}
+			case Stmt::OMPTaskLoopDirectiveClass:
+			{
+				self["type"] = "omptaskloop";
+				break;				
+			}			
 			default:
 			{
 				if(isa<Expr>(p))

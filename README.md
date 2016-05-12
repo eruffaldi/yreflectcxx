@@ -37,6 +37,19 @@ Example of OpenMP
 
 ./yextractmp ../example/testmp.cpp --
 
+Supported OpenMP Statements
+===================
+OMPTaskwaitDirectiveClass - omptaskwait
+OMPTaskyieldDirectiveClass - omptaskyield
+OMPTaskgroupDirectiveClass - omptaskgroup
+OMPTaskLoopDirectiveClass - omptaskloop
+OMPTaskDirectiveClass - omptask
+OMPSingleDirectiveClass - ompsingle
+OMPSectionDirectiveClass - ompsection
+OMPSectionsDirectiveClass - ompsections
+OMPParallelForDirectiveClass - ompparallelfor
+OMPParallelDirectiveClass - ompparallel
+
 Related Publication
 ===================
 The following pubblication is associated to the work discussed here. In particular the SOMA framework was aimed at static multicore partioning of the execution of multicore algorithms.
