@@ -89,13 +89,16 @@ public:
 		}
 	}
 
-	bool MyVisitStmt(Stmt * p,int level , Json::Value & parent)
+	bool MyVisitStmt(const Stmt * p,int level , Json::Value & parent)
 	{	
+		if(!p)
+			return false;
 		for(int i = 0; i < level; i++)
 			std::cout << ' ';
-		std::cout << "stmt:" << p->getStmtClassName() << " " << level << std::endl;
+		std::cout << "stmt:" << p->getStmtClassName() << " (" << (statementid+1) << ") level " << level << std::endl;
 		Json::Value self;
 		self["loc"] = Pair2Value<int,int>(getloc(p->getLocStart()));
+		self["id"] = statementid++;
 		bool descend = true;
 		switch(p->getStmtClass())
 		{
@@ -110,11 +113,11 @@ public:
 				self["type"] = "if";
 				self["id"] = statementid++;
 
-				IfStmt * I = cast<IfStmt>(p);
-				if (Stmt *Then = I->getThen()) {
+				const IfStmt * I = cast<IfStmt>(p);
+				if (const Stmt *Then = I->getThen()) {
 					MyVisitStmt(Then,level+1,self["children"]);
 				}
-				if (Stmt *Else = I->getElse()) {
+				if (const Stmt *Else = I->getElse()) {
 					MyVisitStmt(Else,level+1,self["children"]);
 				}
 				descend = false;
@@ -123,7 +126,7 @@ public:
 			}
 			case Stmt::CapturedStmtClass:
 			{
-				CapturedStmt * C = cast<CapturedStmt>(p);
+				const CapturedStmt * C = cast<CapturedStmt>(p);
 				self["type"] = "captured";
 				MyVisitStmt(C->getCapturedStmt(),level+1,self["children"]);
 				break;
@@ -131,7 +134,7 @@ public:
 			case Stmt::ForStmtClass:
 			{
 				self["type"] = "for";
-				ForStmt * C = cast<ForStmt>(p);
+				const ForStmt * C = cast<ForStmt>(p);
 				descend = true;
 				break;
 			}
@@ -169,8 +172,7 @@ public:
 				// getBody
 				// getWhileLoc () const
 				// getLocStart () const LLVM_READONLY
-				std::cerr << "while\n";
-				WhileStmt * C = cast<WhileStmt>(p);
+				const WhileStmt * C = cast<WhileStmt>(p);
 				self["type"] = "while";
 				self["id"] = statementid++;
 				descend = false;
@@ -180,7 +182,6 @@ public:
 			}
 			case Stmt::DeclStmtClass:
 			{
-				std::cout << "DeclStmtClass " << std::endl;
 //				self["type"] = "decl";
 				descend = false;
 //				parent.append(self);
@@ -253,8 +254,7 @@ public:
 		}
 		if(descend)
 		{
-			self["id"] = statementid++;
-			for (Stmt *SubStmt : p->children())
+			for (const Stmt *SubStmt : p->children())
 			{
 				MyVisitStmt(SubStmt,level+1,self["children"]);
 			}
@@ -267,10 +267,12 @@ public:
 	{
 		if(!fx->getBody())
 		{
-			return false;
+			std::cout << "\tTraverseFunctionDecl missing body " << (std::string)fx->getName() << "\n";
+			return true;
 		}
 		else
 		{
+			std::cout << "\tTraverseFunctionDecl body " << (std::string)fx->getName() << "\n";
 			Json::Value self;
 			self["id"] = statementid++;
 			self["type"] = "function";
@@ -278,7 +280,7 @@ public:
 			Stmt * p = fx->getBody();
 			MyVisitStmt(p,0,self["children"]);
 			root.append(self);
-			return false; // no recursion
+			return true; // no recursion
 		}
 	}
 
@@ -383,7 +385,6 @@ public:
 	void HandleTranslationUnit(ASTContext &Context) override {
 		/* we can use ASTContext to get the TranslationUnitDecl, which is
 		   a single Decl that collectively represents the entire source file */
-
 		if (CI.hasDiagnostics() && CI.getDiagnostics().hasFatalErrorOccurred())
 			return;
 		Visitor.TraverseDecl(Context.getTranslationUnitDecl());
@@ -468,7 +469,7 @@ static cl::extrahelp MoreHelp("\nMore help text...");
 // Usage: llvm::outs() << YourOwnOption.getValue();
 
 int main(int argc, const char **argv) {
-	if(argc < 3)
+	if(argc < 2)
 	{
 		usage();
 		return -1;
