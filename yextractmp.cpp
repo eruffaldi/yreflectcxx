@@ -405,7 +405,7 @@ class MyFrontendAction : public ASTFrontendAction {
 public:
 	MyFrontendAction() 
 	{
-
+		std::cout << "ctor MyFrontendAction\n";
 	}
 
 	~MyFrontendAction()
@@ -413,7 +413,7 @@ public:
 		Json::StreamWriterBuilder wbuilder;
 		wbuilder["indentation"] = "  ";
 		std::string document = Json::writeString(wbuilder, root);
-		std::ofstream onf("out.json");
+		std::ofstream onf(lastfile + ".ast.json");
 		onf << document;
 	}
 
@@ -428,6 +428,8 @@ public:
 #ifdef CLANG37PLUS
 	std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
 	        StringRef file) override {
+		lastfile = file;
+		filecount++;
 		llvm::errs() << "** Creating AST consumer for: " << file << "\n";
 		TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
 		return llvm::make_unique<MyASTConsumer>(TheRewriter, &CI.getASTContext(), CI,root[file],statementid);
@@ -441,7 +443,9 @@ public:
 	}
 #endif
 private:
+	std::string lastfile;
 	int statementid = 1;
+	int filecount = 0;
 	Json::Value root;
 	Rewriter TheRewriter;
 };
